@@ -1,0 +1,46 @@
+-- etl: flights
+
+create schema if not exists kdz_31_etl;
+
+drop table if exists kdz_31_etl.lv1_flights_31;
+create table if not exists kdz_31_etl.lv1_flights_31 (
+	year integer not null,
+	quarter integer not null check(quarter in('1', '2', '3', '4')),
+	month integer not null check(month >= 1 and month <= 12),
+	flight_date date not null, 
+	reporting_airline varchar(10) not null,
+	tail_number varchar(15) null,
+	flight_number integer not null, 
+	origin varchar(3) not null,
+	dest varchar(3) not null,
+	dep_delay_minutes integer null, 
+	cancelled integer not null check(cancelled in('1', '0')), 
+	cancellation_code varchar(1) null check(cancellation_code in('A', 'B', 'C', 'D')),
+	dep_time time null, 
+	air_time integer null, 
+	crs_dep_time time not null, 
+	distance integer not null, 
+	weather_delay integer null 
+);
+
+insert into kdz_31_etl.lv1_flights_31 -- инсертим данные из src, меняя типы даты и времени
+select 
+	year,
+	quarter, 
+	month,
+	(to_timestamp(flight_date, 'M/D/YYYY HH12:MI:SS AM'))::date as flight_date,
+	reporting_airline, 
+	tail_number,
+	flight_number, 
+	origin, 
+	dest, 
+	dep_delay_minutes, 
+	cancelled,
+	cancellation_code,  
+	to_timestamp(dep_time, 'HH24MI')::time as dep_time, 
+	air_time,  
+	to_timestamp(crs_dep_time, 'HH24MI')::time as crs_dep_time, 
+	distance,
+	weather_delay
+from kdz_31_src.lv1_flights_31
+;
