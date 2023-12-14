@@ -1,0 +1,31 @@
+-- src: flights
+
+create schema if not exists kdz_31_src;
+
+drop table if exists kdz_31_src.lv1_flights_31;
+create table if not exists kdz_31_src.lv1_flights_31 (
+	year integer not null,
+	quarter integer not null check(quarter in('1', '2', '3', '4')),
+	month integer not null check(month >= 1 and month <= 12),
+	flight_date varchar(50) not null, 
+	reporting_airline varchar(10) not null,
+	tail_number varchar(15) null,
+	flight_number integer not null, 
+	origin varchar(3) not null,
+	dest varchar(3) not null,
+	dep_delay_minutes decimal(6,2) null, 
+	cancelled decimal(3,2) not null,  
+	cancellation_code varchar(1) null check(cancellation_code in('A', 'B', 'C', 'D')),
+	dep_time varchar(10) null, 
+	air_time decimal(5,2) null, 
+	crs_dep_time varchar(10) not null, 
+	distance decimal(6,2) not null,
+	weather_delay decimal(6,2) null,
+	
+	loaded_ts timestamp not null default (now()) -- добавили новое 
+);
+
+\copy kdz_31_src.lv1_flights_31(year, quarter, month, flight_date, reporting_airline, tail_number, flight_number, origin, dest, crs_dep_time, dep_time, dep_delay_minutes, cancelled, cancellation_code, air_time, distance, weather_delay) from '/Users/alexander/Desktop/хранилища данных/хд кдз/данные/lv1_flights_january_31.csv' with delimiter ',' CSV HEADER;
+\copy kdz_31_src.lv1_flights_31(year, quarter, month, flight_date, reporting_airline, tail_number, flight_number, origin, dest, crs_dep_time, dep_time, dep_delay_minutes, cancelled, cancellation_code, air_time, distance, weather_delay) from '/Users/alexander/Desktop/хранилища данных/хд кдз/данные/lv1_flights_feb_31.csv' with delimiter ',' CSV HEADER;
+\copy kdz_31_src.lv1_flights_31(year, quarter, month, flight_date, reporting_airline, tail_number, flight_number, origin, dest, crs_dep_time, dep_time, dep_delay_minutes, cancelled, cancellation_code, air_time, distance, weather_delay) from '/Users/alexander/Desktop/хранилища данных/хд кдз/данные/lv1_flights_march_31.csv' with delimiter ',' CSV HEADER;
+\copy kdz_31_src.lv1_flights_31(year, quarter, month, flight_date, reporting_airline, tail_number, flight_number, origin, dest, crs_dep_time, dep_time, dep_delay_minutes, cancelled, cancellation_code, air_time, distance, weather_delay) from '/Users/alexander/Desktop/хранилища данных/хд кдз/данные/lv1_flights_april_31.csv' with delimiter ',' CSV HEADER;
