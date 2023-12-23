@@ -1,0 +1,1 @@
+\copy kdz_31_src.lv1_weather_31(local_datetime, t_air_temperature, p0_sea_lvl, p_station_lvl, u_humidity, dd_wind_direction, ff_wind_speed, ff10_max_gust_value, ww_present, ww_recent, c_total_clouds, vv_horizontal_visibility, td_temperature_dewpoint) from '/Users/alexander/Desktop/хранилища данных/хд кдз/данные/lv1_weather_31.csv' with delimiter ';' CSV HEADER;
