@@ -1,0 +1,27 @@
+--создаем схему staging
+create schema if not exists kdz_31_staging;
+
+--создаем таблицу для weather в staging
+drop table kdz_31_staging.weather_31;
+CREATE TABLE kdz_31_staging.weather_31 (
+        icao_code varchar(4) not null default 'KORD', -- дополнительно добавили icao код аэропорта 
+        local_datetime varchar(25) not null,
+        t_air_temperature decimal(3,1) not null, 
+        p0_sea_lvl decimal(4,1) not null,
+        p_station_lvl decimal(4,1) not null,
+        u_humidity integer not null,
+        dd_wind_direction varchar(100) null, 
+        ff_wind_speed integer null, 
+        ff10_max_gust_value integer null, 
+        ww_present varchar(100) null,
+        ww_recent varchar(50) null,
+        c_total_clouds varchar(200) not null, 
+        vv_horizontal_visibility decimal(3,1) not null, 
+        td_temperature_dewpoint decimal(3,1) not null, 
+         loaded_ts timestamp not null default (now()),
+PRIMARY KEY (icao_code,local_datetime)
+);
+
+
+--создаем схему etl
+create schema if not exists kdz_31_etl;

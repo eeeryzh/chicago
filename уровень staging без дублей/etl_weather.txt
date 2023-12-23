@@ -1,21 +1,72 @@
--- etl: weather
+--таблица которая хранит метку времени свежих данных
+drop table if exists kdz_31_etl.load_weather;
+create table if not exists kdz_31_etl.load_weather(
+loaded_ts timestamp not null primary key);
 
-drop table if exists kdz_31_etl.lv1_weather_31;
-create table if not exists kdz_31_etl.lv1_weather_31 as
-select
-	icao_code,
-	cast(local_datetime as timestamp) as local_datetime,
-	t_air_temperature :: integer,
-	p0_sea_lvl,
-	p_station_lvl,
-	u_humidity,
-	dd_wind_direction,
-	ff_wind_speed,
-	ff10_max_gust_value,
-	ww_present,
-	ww_recent,
-	c_total_clouds,
-	vv_horizontal_visibility :: integer, 
-	td_temperature_dewpoint :: integer
-from kdz_31_src.lv1_weather_31
+
+--границы времени загрузки
+drop table if exists kdz_31_etl.load_weather_min_max;
+create table if not exists kdz_31_etl.load_weather_min_max as 
+select 
+min(loaded_ts) as ts1, 
+max(loaded_ts) as ts2 
+from kdz_31_src.lv1_weather_31 
+where loaded_ts > coalesce((select max(loaded_ts) from kdz_31_etl.load_weather), '1970-01-01');
+
+
+--тут самые свежие данные из src
+drop table if exists kdz_31_etl.weather;
+create table if not exists kdz_31_etl.weather as
+select distinct on (sub.icao_code, sub.local_datetime)
+*
+from (
+                select
+                        icao_code,
+                        cast(local_datetime as timestamp) as local_datetime,
+                        t_air_temperature :: integer,
+                        p0_sea_lvl,
+                        p_station_lvl,
+                        u_humidity,
+                        dd_wind_direction,
+                        ff_wind_speed,
+                        ff10_max_gust_value,
+                        ww_present,
+                        ww_recent,
+                        c_total_clouds,
+                        vv_horizontal_visibility :: integer,
+                        td_temperature_dewpoint :: integer,
+                        loaded_ts
+                from kdz_31_src.lv1_weather_31
+                order by icao_code, local_datetime, loaded_ts desc) as sub, kdz_31_etl.load_weather_min_max
+where loaded_ts between ts1 and ts2;
+
+
+--убираем старую метку времени и добавляем новую
+delete from kdz_31_etl.load_weather
+where exists (select 1 from kdz_31_etl.load_weather_min_max);
+insert into kdz_31_etl.load_weather(loaded_ts)
+select ts2
+from kdz_31_etl.load_weather_min_max
+where exists (select 1 from kdz_31_etl.load_weather_min_max);
+
+
+--добавляем данные из etl в staging для weather
+INSERT INTO kdz_31_staging.weather_31
+(icao_code, local_datetime, t_air_temperature, p0_sea_lvl, p_station_lvl, u_humidity, dd_wind_direction, ff_wind_speed, ff10_max_gust_value, ww_present, ww_recent, c_total_clouds, vv_horizontal_visibility, td_temperature_dewpoint)
+select icao_code, local_datetime, t_air_temperature, p0_sea_lvl, p_station_lvl, u_humidity, dd_wind_direction, ff_wind_speed, ff10_max_gust_value, ww_present, ww_recent, c_total_clouds, vv_horizontal_visibility, td_temperature_dewpoint
+from kdz_31_etl.weather
+on conflict (icao_code,local_datetime) do update 
+set t_air_temperature = excluded.t_air_temperature, 
+p0_sea_lvl = excluded.p0_sea_lvl, 
+p_station_lvl = excluded.p_station_lvl, 
+u_humidity = excluded.u_humidity, 
+dd_wind_direction = excluded.dd_wind_direction, 
+ff_wind_speed = excluded.ff_wind_speed, 
+ff10_max_gust_value = excluded.ff10_max_gust_value, 
+ww_present = excluded.ww_present, 
+ww_recent = excluded.ww_recent, 
+c_total_clouds = excluded.c_total_clouds, 
+vv_horizontal_visibility = excluded.vv_horizontal_visibility, 
+td_temperature_dewpoint = excluded.td_temperature_dewpoint,
+loaded_ts = now()
 ;
