@@ -1,46 +1,77 @@
--- etl: flights
+--таблица которая хранит метку времени свежих данных
+drop table if exists kdz_31_etl.load_flights;
+create table if not exists kdz_31_etl.load_flights(
+loaded_ts timestamp not null primary key);
 
-create schema if not exists kdz_31_etl;
 
-drop table if exists kdz_31_etl.lv1_flights_31;
-create table if not exists kdz_31_etl.lv1_flights_31 (
-	year integer not null,
-	quarter integer not null check(quarter in('1', '2', '3', '4')),
-	month integer not null check(month >= 1 and month <= 12),
-	flight_date date not null, 
-	reporting_airline varchar(10) not null,
-	tail_number varchar(15) null,
-	flight_number integer not null, 
-	origin varchar(3) not null,
-	dest varchar(3) not null,
-	dep_delay_minutes integer null, 
-	cancelled integer not null check(cancelled in('1', '0')), 
-	cancellation_code varchar(1) null check(cancellation_code in('A', 'B', 'C', 'D')),
-	dep_time time null, 
-	air_time integer null, 
-	crs_dep_time time not null, 
-	distance integer not null, 
-	weather_delay integer null 
-);
-
-insert into kdz_31_etl.lv1_flights_31 -- инсертим данные из src, меняя типы даты и времени
+--границы времени загрузки
+drop table if exists kdz_31_etl.load_flights_min_max;
+create table if not exists kdz_31_etl.load_flights_min_max as 
 select 
-	year,
-	quarter, 
-	month,
-	(to_timestamp(flight_date, 'M/D/YYYY HH12:MI:SS AM'))::date as flight_date,
-	reporting_airline, 
-	tail_number,
-	flight_number, 
-	origin, 
-	dest, 
-	dep_delay_minutes, 
-	cancelled,
-	cancellation_code,  
-	to_timestamp(dep_time, 'HH24MI')::time as dep_time, 
-	air_time,  
-	to_timestamp(crs_dep_time, 'HH24MI')::time as crs_dep_time, 
-	distance,
-	weather_delay
-from kdz_31_src.lv1_flights_31
+min(loaded_ts) as ts1, 
+max(loaded_ts) as ts2 
+from kdz_31_src.lv1_flights_31 
+where loaded_ts > coalesce((select max(loaded_ts) from kdz_31_etl.load_flights), '1970-01-01');
+
+
+--тут самые свежие данные из src
+drop table if exists kdz_31_etl.flights;
+create table if not exists kdz_31_etl.flights as
+select distinct on (sub.flight_date, sub.flight_number, sub.origin, sub.dest, sub.crs_dep_time)
+*
+from (
+                select
+                        year,
+                                quarter,
+                                month,
+                                (to_timestamp(flight_date, 'MM/DD/YYYY HH12:MI:SS'))::date as flight_date,
+                                reporting_airline,
+                                tail_number,
+                                flight_number,
+                                origin,
+                                dest,
+                                dep_delay_minutes,
+                                cancelled,
+                                cancellation_code,
+                                to_timestamp(dep_time, 'HH24MI')::time as dep_time,
+                                air_time,
+                                to_timestamp(crs_dep_time, 'HH24MI')::time as crs_dep_time,
+                                distance,
+                                weather_delay,
+                                loaded_ts
+                        from kdz_31_src.lv1_flights_31
+                        order by flight_date, flight_number, origin, dest, crs_dep_time, loaded_ts desc) as sub, kdz_31_etl.load_flights_min_max
+where loaded_ts between ts1 and ts2;
+
+
+--убираем старую метку времени и добавляем новую
+delete from kdz_31_etl.load_flights
+where exists (select 1 from kdz_31_etl.load_flights_min_max);
+
+
+insert into kdz_31_etl.load_flights(loaded_ts)
+select ts2
+from kdz_31_etl.load_flights_min_max
+where exists (select 1 from kdz_31_etl.load_flights_min_max);
+
+
+--добавляем данные из etl в staging для flights
+INSERT INTO kdz_31_staging.flights_31
+("year", quarter, "month", flight_date, dep_time, crs_dep_time, air_time, dep_delay_minutes, cancelled, cancellation_code, weather_delay, reporting_airline, tail_number, flight_number, distance, origin, dest)
+select "year", quarter, "month", flight_date, dep_time, crs_dep_time, air_time, dep_delay_minutes, cancelled, cancellation_code, weather_delay, reporting_airline, tail_number, flight_number, distance, origin, dest
+from kdz_31_etl.flights
+on conflict(flight_date, flight_number, origin, dest, crs_dep_time) do update
+set "year" = excluded."year", 
+quarter = excluded.quarter, 
+"month" = excluded."month", 
+dep_time = excluded.dep_time, 
+air_time = excluded.air_time, 
+dep_delay_minutes = excluded.dep_delay_minutes, 
+cancelled = excluded.cancelled, 
+cancellation_code = excluded.cancellation_code, 
+weather_delay = excluded.weather_delay, 
+reporting_airline = excluded.reporting_airline, 
+tail_number = excluded.tail_number, 
+distance = excluded.distance,
+loaded_ts = now()
 ;

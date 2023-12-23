@@ -1,0 +1,27 @@
+--создаем схему staging
+create schema if not exists kdz_31_staging;
+
+
+--создаем таблицу для flights в staging
+drop table kdz_31_staging.flights_31;
+CREATE TABLE kdz_31_staging.flights_31 (
+year integer NOT NULL,
+quarter integer NULL,
+month integer NOT NULL,
+flight_date date NOT NULL,
+dep_time time NULL,
+crs_dep_time time NOT NULL,
+air_time decimal(5,2) NULL,
+dep_delay_minutes decimal(6,2)NULL,
+cancelled decimal(3,2)NOT NULL,
+cancellation_code varchar(1) NULL,
+weather_delay decimal(6,2)NULL,
+reporting_airline varchar(10) NULL,
+tail_number varchar(15) null,
+flight_number integer NOT NULL,
+distance decimal(6,2) NULL,
+origin varchar(3) NULL,
+dest varchar(3) NULL,
+loaded_ts timestamp default(now()),
+CONSTRAINT psa_flights_pkey PRIMARY KEY (flight_date, flight_number, origin, dest, crs_dep_time)
+);
