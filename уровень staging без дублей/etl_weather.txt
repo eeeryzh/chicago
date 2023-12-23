@@ -1,0 +1,21 @@
+-- etl: weather
+
+drop table if exists kdz_31_etl.lv1_weather_31;
+create table if not exists kdz_31_etl.lv1_weather_31 as
+select
+	icao_code,
+	cast(local_datetime as timestamp) as local_datetime,
+	t_air_temperature :: integer,
+	p0_sea_lvl,
+	p_station_lvl,
+	u_humidity,
+	dd_wind_direction,
+	ff_wind_speed,
+	ff10_max_gust_value,
+	ww_present,
+	ww_recent,
+	c_total_clouds,
+	vv_horizontal_visibility :: integer, 
+	td_temperature_dewpoint :: integer
+from kdz_31_src.lv1_weather_31
+;
