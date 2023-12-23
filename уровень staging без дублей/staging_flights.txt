@@ -25,3 +25,6 @@ dest varchar(3) NULL,
 loaded_ts timestamp default(now()),
 CONSTRAINT psa_flights_pkey PRIMARY KEY (flight_date, flight_number, origin, dest, crs_dep_time)
 );
+
+--создаем схему etl
+create schema if not exists kdz_31_etl;
