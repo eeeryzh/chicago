@@ -1,0 +1,29 @@
+--создаем представление flights_v
+CREATE SCHEMA kdz_31_views;
+CREATE VIEW kdz_31_views.flights_v AS
+SELECT
+ flight_number,
+ flight_actual_time,
+ t1.air_name AS air_name_origin,
+ t2.air_name AS air_name_destination,
+ distance,
+ dep_delay_min,
+ fd.weather_type_dk,
+--находим сумму количества плохих природных явлений
+ CASE WHEN wt.cold = TRUE THEN 1 ELSE 0 END +
+ CASE WHEN wt.rain = TRUE THEN 1 ELSE 0 END +
+ CASE WHEN wt.snow = TRUE THEN 1 ELSE 0 END +
+ CASE WHEN wt.thunderstorm = TRUE THEN 1 ELSE 0 END +
+ CASE WHEN wt.drizzle = TRUE THEN 1 ELSE 0 END +
+ CASE WHEN wt.fog_mist = TRUE THEN 1 ELSE 0 END AS total_weather,
+ cancelled,
+ cancellation_code,
+ max_gws,
+ t,
+ w_speed,
+ air_time
+FROM fact_departure fd
+LEFT JOIN dds.airport t1 ON fd.airport_origin_dk = t1.airport_dk
+LEFT JOIN dds.airport t2 ON fd.airport_destination_dk = t2.airport_dk
+LEFT JOIN dds.weather_type wt ON fd.weather_type_dk = wt.weather_type_dk
+WHERE author = '31';

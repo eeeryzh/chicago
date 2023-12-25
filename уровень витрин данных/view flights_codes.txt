@@ -1,0 +1,19 @@
+--создаем таблицу - словарь для расшифровки причин отмены рейсов
+CREATE TABLE kdz_31_views.cancellation_codes (
+   cancellation_code VARCHAR(1),
+   description VARCHAR(100)
+);
+INSERT INTO kdz_31_views.cancellation_codes (cancellation_code, description) VALUES
+('A', 'Carrier'),
+('B', 'Weather'),
+('C', 'National Air System'),
+('D', 'Security');
+
+
+
+
+--создаем представление flights_v + cancellation_codes:
+CREATE VIEW kdz_31_views.flights_codes_v AS
+SELECT f.*, c.description
+FROM kdz_31_views.flights_v f
+LEFT JOIN kdz_31_views.cancellation_codes c ON f.cancellation_code = c.cancellation_code;

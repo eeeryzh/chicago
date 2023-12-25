@@ -1,0 +1,66 @@
+INSERT INTO mart.fact_departure (
+airport_origin_dk,
+  airport_destination_dk,
+  flight_scheduled_ts,
+  flight_number,
+  weather_type_dk,
+  flight_actual_time,
+  distance,
+  tail_number,
+  airline,
+  dep_delay_min,
+  cancelled,
+  cancellation_code,
+  t,
+  max_gws,
+  w_speed,
+  air_time,
+  loaded_ts,
+  author
+)
+SELECT
+  f.airport_origin_dk,
+  f.airport_dest_dk,
+  f.flight_dep_scheduled_ts,
+  f.flight_number_reporting_airline,
+  w.weather_type_dk,
+  f.flight_dep_actual_ts,
+  f.distance,
+  f.tail_number,
+  f.report_airline,
+  f.dep_delay_minutes,
+  f.cancelled,
+  f.cancellation_code,
+  w.t,
+  w.max_gws,
+  w.w_speed,
+  f.air_time,
+  (now())::timestamp without time zone AS loaded_ts,
+  '31' AS author
+FROM
+  kdz_31_dds.flights_31 f
+JOIN
+  kdz_31_dds.airport_weather_31 w ON f.airport_origin_dk = w.airport_dk –может быть только один airport_origin_dk, который совпадает с аэропортом в таблице погоды 
+  AND f.flight_dep_scheduled_ts >= w.date_start
+  AND f.flight_dep_scheduled_ts < w.date_end
+ON CONFLICT (flight_scheduled_ts, flight_number, airport_origin_dk, airport_destination_dk) do update
+set
+airport_origin_dk = excluded.airport_origin_dk,
+  airport_destination_dk = excluded.airport_destination_dk,
+  flight_scheduled_ts = excluded.flight_scheduled_ts ,
+  flight_number = excluded.flight_number ,
+  weather_type_dk = excluded.weather_type_dk ,
+  flight_actual_time = excluded.flight_actual_time ,
+  distance = excluded.distance ,
+  tail_number = excluded.tail_number ,
+  airline = excluded.airline ,
+  dep_delay_min = excluded.dep_delay_min ,
+  cancelled = excluded.cancelled ,
+  cancellation_code = excluded.cancellation_code ,
+  t = excluded.t ,
+  max_gws = excluded.max_gws ,
+  w_speed = excluded.w_speed ,
+  air_time = excluded.air_time ,
+  loaded_ts = now(),
+  author = '31'
+;
