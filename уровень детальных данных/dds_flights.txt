@@ -1,0 +1,106 @@
+--аэропорты
+drop table if exists kdz_31_dds.flights_31;
+CREATE TABLE kdz_31_dds.flights_31 (
+	year int NULL,
+	quarter int NULL,
+	month int NULL,
+	flight_scheduled_date date NULL,
+	flight_actual_date date NULL,
+	flight_dep_scheduled_ts timestamp NOT NULL,
+	flight_dep_actual_ts timestamp NULL,
+	report_airline varchar(10) NOT NULL,
+	tail_number varchar(10) NOT NULL,
+	flight_number_reporting_airline varchar(15) NOT NULL,
+	airport_origin_dk int NULL, --постоянный ключ аэропорта. нужно взять из таблицы аэропортов
+	origin_code varchar(5) null,
+	airport_dest_dk int NULL,  --постоянный ключ аэропорта. нужно взять из таблицы аэропортов
+	dest_code varchar(5) null,
+	dep_delay_minutes float NULL,
+	cancelled int NOT NULL,
+	cancellation_code char(1) NULL,
+	weather_delay float NULL,
+	air_time float NULL,
+	distance float NULL,
+	loaded_ts timestamp default(now()),
+	CONSTRAINT lights_pk PRIMARY KEY (flight_dep_scheduled_ts, flight_number_reporting_airline, origin_code, dest_code)
+);
+--выше код создания таблицы
+insert
+	into
+	kdz_31_dds.flights_31
+select
+	tbl1.*
+from
+	(
+	select
+   stg_flights_31.year,
+   stg_flights_31.quarter ,
+   stg_flights_31.month,
+   stg_flights_31.flight_date as flight_scheduled_date,
+   (TO_TIMESTAMP(stg_flights_31.flight_date || ' ' || stg_flights_31.crs_dep_time, 'YYYY-MM-DD HH24:MI:SS') + INTERVAL
+   '1 minute' * stg_flights_31.dep_delay_minutes)::date AS flight_actual_date,
+--берем дату и плановое время вылета + добавляем минуты опоздания, приводим все к дате
+   (TO_TIMESTAMP(stg_flights_31.flight_date || ' ' || stg_flights_31.crs_dep_time, 'YYYY-MM-DD HH24:MI:SS'))::timestamp without time zone AS flight_dep_scheduled,
+  
+   (TO_TIMESTAMP(stg_flights_31.flight_date || ' ' || stg_flights_31.crs_dep_time, 'YYYY-MM-DD HH24:MI:SS') +
+   INTERVAL '1 minute' * stg_flights_31.dep_delay_minutes)::timestamp without time zone AS flight_dep_actual_ts,
+--берем дату и плановое время вылета + добавляем минуты опоздания
+   stg_flights_31.reporting_airline as report_airline,
+   COALESCE(stg_flights_31.tail_number, ' ') AS tail_number, --если NULL, заменяем на пустую строку
+   stg_flights_31.flight_number as flight_number_reporting_airline,
+   dwh_cust_1.dwh_dk as airport_origin_dk, --берем ключ двх
+   stg_flights_31.origin as origin_code,
+   dwh_cust_2.dwh_dk as airport_dest_dk, --берем ключ двх
+   stg_flights_31.dest as dest_code,
+   stg_flights_31.dep_delay_minutes,
+   stg_flights_31.cancelled , 
+   stg_flights_31.cancellation_code ,
+   stg_flights_31.weather_delay,
+   stg_flights_31.air_time , 
+   stg_flights_31.distance
+	from
+		(
+		select *
+		from
+			kdz_31_staging.flights_31
+		where
+			loaded_ts = (
+			select
+				max(loaded_ts)
+			from
+				kdz_31_staging.flights_31
+				--отбираем только самые новые значения
+)) stg_flights_31
+--перекодировка ключей
+		inner join dwh.id_airport dwh_cust_1
+           on
+			stg_flights_31.origin = dwh_cust_1.src_iata_id --джойним по коду
+   inner join dwh.id_airport dwh_cust_2
+           on
+			stg_flights_31.dest = dwh_cust_2.src_iata_id --джойним по коду
+--джойним два раза потому что у нас двум полям соответствует одно поле из двх
+) tbl1
+on conflict (flight_dep_scheduled_ts, flight_number_reporting_airline, origin_code, dest_code) do update
+ set
+     year = excluded.year
+   ,  quarter = excluded.quarter
+   ,  month = excluded.month
+   ,  flight_scheduled_date = excluded.flight_scheduled_date
+   ,  flight_actual_date = excluded.flight_actual_date
+   ,  flight_dep_scheduled_ts = excluded.flight_dep_scheduled_ts
+   ,  flight_dep_actual_ts = excluded.flight_dep_actual_ts
+   ,  report_airline = excluded.report_airline
+   ,  tail_number = excluded.tail_number
+   ,  flight_number_reporting_airline = excluded.flight_number_reporting_airline
+   ,  airport_origin_dk = excluded.airport_origin_dk
+   ,  origin_code = excluded.origin_code
+   ,  airport_dest_dk = excluded.airport_dest_dk
+   ,  dest_code = excluded.dest_code
+   ,  dep_delay_minutes = excluded.dep_delay_minutes
+   ,  cancelled = excluded.cancelled
+   ,  cancellation_code = excluded.cancellation_code
+   ,  weather_delay = excluded.weather_delay
+   ,  air_time = excluded.air_time
+   ,  distance = excluded.distance
+   ,  loaded_ts = now()
+;
